@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BudgetFlow QA</title>
+<style>
+body{font:14px system-ui,sans-serif;max-width:900px;margin:0 auto;padding:24px;background:#f6f6f0;color:#202119}
+h1{margin:0 0 6px}p{color:#666}.summary{padding:14px;border-radius:10px;background:#fff;border:1px solid #ddd;margin:16px 0}.pass{color:#176b3a}.fail{color:#a21d1d}.test{padding:9px 0;border-bottom:1px solid #e5e5df}.test b{display:inline-block;width:70px}.run{padding:10px 14px;border:0;border-radius:7px;background:#202119;color:#fff;font-weight:700;cursor:pointer}.frame{position:absolute;left:-10000px;width:390px;height:800px;border:0}
+</style>
+</head>
+<body>
+<h1>BudgetFlow QA runner</h1>
+<p>Automated smoke checks for the static application. The runner snapshots and restores localStorage after testing.</p>
+<button class="run" id="run">Run QA</button>
+<div class="summary" id="summary">Ready.</div>
+<div id="results"></div>
+<iframe class="frame" id="app" title="BudgetFlow test application"></iframe>
+<script>
+(()=>{const $=s=>document.querySelector(s),out=$('#results'),summary=$('#summary'),frame=$('#app');let passed=0,failed=0;
+function check(name,fn){try{if(fn()){passed++;out.innerHTML+='<div class="test pass"><b>PASS</b>'+name+'</div>'}else{failed++;out.innerHTML+='<div class="test fail"><b>FAIL</b>'+name+'</div>'}}catch(e){failed++;out.innerHTML+='<div class="test fail"><b>ERROR</b>'+name+' — '+e.message+'</div>'}}
+async function run(){passed=failed=0;out.innerHTML='';summary.textContent='Running…';const w=frame.contentWindow,d=w.localStorage,key='budgetflow-v2',backup=d.getItem(key);try{d.removeItem(key);frame.src='index.html?qa='+Date.now();await new Promise(r=>frame.onload=r);const doc=frame.contentDocument;
+check('Application loads with a title',()=>doc.title.includes('BudgetFlow'));
+check('All six modules are present',()=>doc.querySelectorAll('[data-tab]').length>=12);
+check('Overview renders balance and challenge day',()=>!!doc.querySelector('#balance')&&!!doc.querySelector('#daylabel')&&doc.querySelector('#balance').textContent.includes('₹'));
+check('Every form control has an accessible name',()=>[...doc.querySelectorAll('input,select')].every(x=>x.getAttribute('aria-label')||doc.querySelector('label[for="'+x.id+'"]')||x.closest('label')));
+check('Keyboard focus indicator rule exists',()=>[...doc.styleSheets].some(s=>{try{return [...s.cssRules].some(r=>r.selectorText&&r.selectorText.includes('focus-visible'))}catch{return false}}));
+const nav=doc.querySelector('[data-tab="transactions"]');nav.click();check('Transactions tab activates',()=>doc.querySelector('#view-transactions').classList.contains('active'));
+const txBefore=doc.querySelectorAll('#alltx .row').length;doc.querySelector('#txname').value='QA Expense';doc.querySelector('#txamount').value='123';doc.querySelector('#txform button').click();check('Expense can be added',()=>doc.querySelectorAll('#alltx .row').length===txBefore+1);
+check('Expense amount affects balance',()=>!doc.querySelector('#balance').textContent.includes('₹10,000'));
+doc.querySelector('[data-tab="commitments"]').click();doc.querySelector('#commname').value='QA Bill';doc.querySelector('#commamount').value='250';doc.querySelector('#commdate').value=new Date(Date.now()+86400000*2).toISOString().slice(0,10);doc.querySelector('#commform button').click();check('Commitment can be added',()=>doc.querySelectorAll('#allcomm .row').length>=1);
+doc.querySelector('[data-tab="goals"]').click();doc.querySelector('#goalname').value='QA Goal';doc.querySelector('#goaltarget').value='500';doc.querySelector('#goalform button').click();check('Savings goal can be created',()=>doc.querySelector('#allgoals').textContent.includes('QA Goal'));
+doc.querySelector('[data-tab="lab"]').click();doc.querySelector('#simname').value='QA Purchase';doc.querySelector('#simamount').value='100';doc.querySelector('#simcommit').checked=true;doc.querySelector('#commitdecision').click();check('Decision can be committed',()=>doc.querySelector('#decisions').textContent.includes('QA Purchase'));
+check('CSV export control exists',()=>!!doc.querySelector('#export'));
+check('Native dialogs are used',()=>doc.querySelectorAll('dialog').length>=2);
+const source=await fetch('index.html?qa-source='+Date.now()).then(r=>r.text());check('CSP is present',()=>source.includes('Content-Security-Policy'));check('No prompt/confirm calls',()=>!source.includes('prompt(')&&!source.includes('confirm('));check('Reduced-motion support exists',()=>source.includes('prefers-reduced-motion'));
+summary.innerHTML='<strong>'+passed+' passed / '+failed+' failed</strong>';}catch(e){summary.textContent='QA runner error: '+e.message}finally{if(backup===null)d.removeItem(key);else d.setItem(key,backup)}}$('#run').onclick=run})();
+</script>
+</body>
+</html>
