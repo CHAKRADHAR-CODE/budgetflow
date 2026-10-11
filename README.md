@@ -98,12 +98,25 @@ The repository is a static site. Deploy the repository root with a static hostin
 
 Current production project: **budgetflow-vert-six**
 
+## Installability and offline support
+
+BudgetFlow is also installable as a lightweight PWA:
+
+- Web App Manifest with standalone display mode.
+- Service worker caches the core app shell for offline startup.
+- SVG app icon is included without an external image dependency.
+- Financial data remains in browser localStorage.
+
 ## Repository structure
 
 ~~~text
 budgetflow/
-├── index.html     # application UI, styles and client-side application logic
-└── README.md      # product, data model, security, accessibility and QA documentation
+├── index.html              # application UI, styles and client-side application logic
+├── manifest.webmanifest    # PWA metadata
+├── sw.js                   # offline application-shell cache
+├── icon.svg                # installable app icon
+├── qa.html                 # browser smoke-test runner
+└── README.md               # product, security, accessibility and QA documentation
 ~~~
 
 The single-file structure is intentional for zero-build portability: the project can be copied to a static host and run without Node dependencies.
